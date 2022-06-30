@@ -1,5 +1,10 @@
 # Changelog
 
+### Changelog 2.03
+- Readded ability to refresh PSM games. Thanks to KuromeSan.
+- Added support for FW 3.74. Thanks to RealYoti.
+- Other fixes and improvements.
+
 ### Changelog 2.02
 - Reverted PSM refresh due to crashes.
 
