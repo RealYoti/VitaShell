@@ -148,10 +148,12 @@ int _shellKernelMountById(ShellMountIdArgs *args) {
       break;
 
     case 0xDBB29DB7: // 3.60 retail
+    case 0xB5F8EA7C: // 3.61 retail
       module_get_offset(KERNEL_PID, tai_info.modid, 0, 0x2DE1, (uintptr_t *)&sceAppMgrFindProcessInfoByPid);
       module_get_offset(KERNEL_PID, tai_info.modid, 0, 0x19B51, (uintptr_t *)&sceAppMgrMountById);
       break;
 
+    case 0x23B967C5: // 3.63 retail
     case 0x1C9879D6: // 3.65 retail
       module_get_offset(KERNEL_PID, tai_info.modid, 0, 0x2DE1, (uintptr_t *)&sceAppMgrFindProcessInfoByPid);
       module_get_offset(KERNEL_PID, tai_info.modid, 0, 0x19E61, (uintptr_t *)&sceAppMgrMountById);
@@ -276,6 +278,11 @@ int module_start(SceSize args, void *argp) {
       module_get_offset(KERNEL_PID, info.modid, 0, 0x138C1, (uintptr_t *)&sceIoFindMountPoint);
       break;
 
+    case 0xE923F19C: // 3.61 retail
+      module_get_offset(KERNEL_PID, info.modid, 0, 0x138D5, (uintptr_t *)&sceIoFindMountPoint);
+      break;
+
+    case 0x5FC2B87D: // 3.63 retail
     case 0xA96ACE9D: // 3.65 retail
     case 0x3347A95F: // 3.67 retail
     case 0x90DA33DE: // 3.68 retail
