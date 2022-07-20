@@ -6,5 +6,6 @@
 .vscode/
 *.elf
 *.sfo
+!release/param.sfo
 *.velf
 build
