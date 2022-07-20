@@ -1,5 +1,8 @@
 # Changelog
 
+### Changelog 2.04
+- Added support for FW 3.61 and 3.63. Thanks to RealYoti.
+
 ### Changelog 2.03
 - Readded ability to refresh PSM games. Thanks to KuromeSan.
 - Added support for FW 3.74. Thanks to RealYoti.
