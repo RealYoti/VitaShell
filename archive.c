@@ -31,7 +31,7 @@ struct archive *archive_fd = NULL;
 static int need_password = 0;
 static char password[128];
 
-int checkForUnsafeImports(const Elf32_Ehdr *ehdr, const Elf32_Phdr *phdr, void *buffer);
+int checkForUnsafeImports(void *buffer);
 char *uncompressBuffer(const Elf32_Ehdr *ehdr, const Elf32_Phdr *phdr, const segment_info *segment,
                        const char *buffer);
 
@@ -448,7 +448,7 @@ int archiveCheckFilesForUnsafeFself() {
       uint64_t phdr_offset = *(uint64_t *)(sce_header + 0x44);
       uint64_t section_info_offset = *(uint64_t *)(sce_header + 0x54);
 
-      // jump to ehdr
+      // jump to elf1
       // Until here we have read 0x88 bytes
       int i;
       for (i = 0; i < elf1_offset - 0x88; i += sizeof(uint32_t)) {
@@ -461,24 +461,24 @@ int archiveCheckFilesForUnsafeFself() {
       if (buffer) {
         archive_read_data(archive, buffer, stat->st_size);
 
-        Elf32_Ehdr *ehdr = (Elf32_Ehdr*)buffer;
+        Elf32_Ehdr *elf1 = (Elf32_Ehdr*)buffer;
         Elf32_Phdr *phdr = (Elf32_Phdr*)(buffer + phdr_offset - elf1_offset);
         segment_info *info = (segment_info*)(buffer + section_info_offset - elf1_offset);
 
-        // segment is a pointer to the first segment
+        // segment is elf2 section
         char *segment = buffer + info->offset - elf1_offset;
 
         // zlib compress magic
         char *uncompressed_buffer = NULL;
         if (segment[0] == 0x78) {
-          // uncompressedBuffer will return uncompressed segments
-          uncompressed_buffer = uncompressBuffer(ehdr, phdr, info, segment);
+          // uncompressedBuffer will return elf2 section
+          uncompressed_buffer = uncompressBuffer(elf1, phdr, info, segment);
           if (uncompressed_buffer) {
             segment = uncompressed_buffer;
           }
         }
 
-        int unsafe = checkForUnsafeImports(ehdr, phdr, segment);
+        int unsafe = checkForUnsafeImports(segment);
 
         if (uncompressed_buffer)
           free(uncompressed_buffer);
