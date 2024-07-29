@@ -85,7 +85,7 @@ If your system language is for example french, it will load from `ux0:VitaShell/
 Languages files are available in the `l10n` folder of this repository.
 
 ## Building
-Install [vitasdk](https://github.com/vitasdk) and build VitaShell using:
+Install [Vita SDK](https://github.com/vitasdk) and build VitaShell using:
 
 ```
 git clone https://github.com/RealYoti/VitaShell

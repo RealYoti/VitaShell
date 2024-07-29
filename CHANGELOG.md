@@ -1,6 +1,7 @@
 # Changelog
 
 ### Changelog 2.05
+- Use this fork repo to check for a newer versions.
 - Added ability to refresh PSP games. Thanks to KuromeSan.
 
 ### Changelog 2.04
