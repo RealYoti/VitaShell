@@ -1,5 +1,8 @@
 # Changelog
 
+### Changelog 2.05
+- Added ability to refresh PSP games. Thanks to KuromeSan.
+
 ### Changelog 2.04
 - Added support for FW 3.61 and 3.63. Thanks to RealYoti.
 

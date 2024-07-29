@@ -88,7 +88,9 @@ Languages files are available in the `l10n` folder of this repository.
 Install [vitasdk](https://github.com/vitasdk) and build VitaShell using:
 
 ```
-mkdir build && cd build && cmake .. && make
+git clone https://github.com/RealYoti/VitaShell
+cd VitaShell/
+mkdir build && cd build && cmake .. && cd modules/kernel && make && cd ../patch && make && cd ../usbdevice && make && cd ../user && make && cd ../.. && make
 ```
 
 ## Credits
