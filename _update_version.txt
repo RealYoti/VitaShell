@@ -2,3 +2,4 @@ pkg/sce_sys/livearea/contents/template.xml:31
 CHANGELOG.md
 CMakeLists.txt:17
 main.h:57
+update_release.sh:8
