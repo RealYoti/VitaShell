@@ -470,10 +470,14 @@ int shortCuts() {
   }
 
   // QR
-  if (current_pad[PAD_CIRCLE] && enabledQR()) {
-    startQR();
-    initMessageDialog(MESSAGE_DIALOG_QR_CODE, language_container[QR_SCANNING]);
-    setDialogStep(DIALOG_STEP_QR);
+  if (current_pad[PAD_CIRCLE]/* && enabledQR()*/) {
+    initQR();
+    if (enabledQR())
+    {
+        startQR();
+        initMessageDialog(MESSAGE_DIALOG_QR_CODE, language_container[QR_SCANNING]);
+        setDialogStep(DIALOG_STEP_QR);
+    }
   }
 
   return 0;

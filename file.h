@@ -76,6 +76,7 @@ typedef struct {
   uint64_t max;
   void (* SetProgress)(uint64_t value, uint64_t max);
   int (* cancelHandler)();
+  SceUID fp;
 } FileProcessParam;
 
 typedef struct FileListEntry {

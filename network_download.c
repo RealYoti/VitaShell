@@ -16,6 +16,13 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <curl/curl.h>
+#include <curl/curl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <libgen.h>
+
 #include "main.h"
 #include "io_process.h"
 #include "network_download.h"
@@ -28,198 +35,229 @@
 
 #define VITASHELL_USER_AGENT "VitaShell/1.00 libhttp/1.1"
 
-int getDownloadFileSize(const char *src, uint64_t *size) {
-  int res;
-  int statusCode;
-  int tmplId = -1, connId = -1, reqId = -1;
+static char *parse_filename(const char *ptr, size_t len)
+{
+  char *copy;
+  char *p;
+  char *q;
+  char  stop = '\0';
 
-  res = sceHttpCreateTemplate(VITASHELL_USER_AGENT, SCE_HTTP_VERSION_1_1, SCE_TRUE);
-  if (res < 0)
-    goto ERROR_EXIT;
+  /* simple implementation of strndup() */
+  copy = malloc(len + 1);
+  if(!copy)
+    return NULL;
+  memcpy(copy, ptr, len);
+  copy[len] = '\0';
 
-  tmplId = res;
-
-  res = sceHttpCreateConnectionWithURL(tmplId, src, SCE_TRUE);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  connId = res;
-
-  res = sceHttpCreateRequestWithURL(connId, SCE_HTTP_METHOD_GET, src, 0);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  reqId = res;
-
-  res = sceHttpSendRequest(reqId, NULL, 0);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  res = sceHttpGetStatusCode(reqId, &statusCode);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  if (statusCode == 200) {
-    res = sceHttpGetResponseContentLength(reqId, size);
+  p = copy;
+  if(*p == '\'' || *p == '"') {
+    /* store the starting quote */
+    stop = *p;
+    p++;
   }
+  else
+    stop = ';';
 
-ERROR_EXIT:
-  if (reqId >= 0)
-    sceHttpDeleteRequest(reqId);
+  /* scan for the end letter and stop there */
+  q = strchr(p, stop);
+  if(q)
+    *q = '\0';
 
-  if (connId >= 0)
-    sceHttpDeleteConnection(connId);
-
-  if (tmplId >= 0)
-    sceHttpDeleteTemplate(tmplId);
-
-  return res;
-}
-
-int getFieldFromHeader(const char *src, const char *field, const char **data, unsigned int *valueLen) {
-  int res;
-  char *header;
-  unsigned int headerSize;
-  int tmplId = -1, connId = -1, reqId = -1;
-
-  res = sceHttpCreateTemplate(VITASHELL_USER_AGENT, SCE_HTTP_VERSION_1_1, SCE_TRUE);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  tmplId = res;
-
-  res = sceHttpCreateConnectionWithURL(tmplId, src, SCE_TRUE);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  connId = res;
-  
-  res = sceHttpCreateRequestWithURL(connId, SCE_HTTP_METHOD_GET, src,  0);
-  if (res < 0)
-    goto ERROR_EXIT;
-  
-  reqId = res;
-  
-  res = sceHttpSendRequest(reqId, NULL, 0);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  res = sceHttpGetAllResponseHeaders(reqId, &header, &headerSize);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  res = sceHttpParseResponseHeader(header, headerSize, field, data, valueLen);
-  if (res < 0) {
-    *data = "";
-    *valueLen = 0;
-    res = 0;
-  }
-  
-ERROR_EXIT:
-  if (reqId >= 0)
-    sceHttpDeleteRequest(reqId);
-
-  if (connId >= 0)
-    sceHttpDeleteConnection(connId);
-
-  if (tmplId >= 0)
-    sceHttpDeleteTemplate(tmplId);
-
-  return res;
-}
-
-int downloadFile(const char *src, const char *dst, FileProcessParam *param) {
-  int res;
-  int statusCode;
-  int tmplId = -1, connId = -1, reqId = -1;
-  SceUID fd = -1;
-  int ret = 1;
-
-  res = sceHttpCreateTemplate(VITASHELL_USER_AGENT, SCE_HTTP_VERSION_1_1, SCE_TRUE);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  tmplId = res;
-
-  res = sceHttpCreateConnectionWithURL(tmplId, src, SCE_TRUE);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  connId = res;
-
-  res = sceHttpCreateRequestWithURL(connId, SCE_HTTP_METHOD_GET, src, 0);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  reqId = res;
-
-  res = sceHttpSendRequest(reqId, NULL, 0);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  res = sceHttpGetStatusCode(reqId, &statusCode);
-  if (res < 0)
-    goto ERROR_EXIT;
-
-  if (statusCode == 200) {    
-    res = sceIoOpen(dst, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
-    if (res < 0)
-      goto ERROR_EXIT;
-
-    fd = res;
-
-    uint8_t buf[4096];
-
-    while (1) {
-      int read = sceHttpReadData(reqId, buf, sizeof(buf));
-      
-      if (read < 0) {
-        res = read;
-        break;
-      }
-      
-      if (read == 0)
-        break;
-
-      int written = sceIoWrite(fd, buf, read);
-      
-      if (written < 0) {
-        res = written;
-        break;
-      }
-
-      if (param) {
-        if (param->value)
-          (*param->value) += read;
-
-        if (param->SetProgress)
-          param->SetProgress(param->value ? *param->value : 0, param->max);
-
-        if (param->cancelHandler && param->cancelHandler()) {
-          ret = 0;
-          break;
-        }
-      }
+  /* if the filename contains a path, only use filename portion */
+  q = strrchr(p, '/');
+  if(q) {
+    p = q + 1;
+    if(!*p) {
+      free(copy);
+      return NULL;
     }
   }
 
-ERROR_EXIT:
-  if (fd >= 0)
-    sceIoClose(fd);
+  /* If the filename contains a backslash, only use filename portion. The idea
+     is that even systems that do not handle backslashes as path separators
+     probably want the path removed for convenience. */
+  q = strrchr(p, '\\');
+  if(q) {
+    p = q + 1;
+    if(!*p) {
+      free(copy);
+      return NULL;
+    }
+  }
 
-  if (reqId >= 0)
-    sceHttpDeleteRequest(reqId);
+  /* make sure the filename does not end in \r or \n */
+  q = strchr(p, '\r');
+  if(q)
+    *q = '\0';
 
-  if (connId >= 0)
-    sceHttpDeleteConnection(connId);
+  q = strchr(p, '\n');
+  if(q)
+    *q = '\0';
 
-  if (tmplId >= 0)
-    sceHttpDeleteTemplate(tmplId);
+  if(copy != p)
+    memmove(copy, p, strlen(p) + 1);
 
-  if (res < 0)
-    return res;
+  return copy;
+}
 
-  return ret;
+
+//static char* fname = NULL;
+
+size_t header_cb(char *buffer, size_t size, size_t nitems, void *userdata)
+{
+    const size_t cb = size * nitems;
+    const char *end = (char *)buffer + cb;
+    const char *str = buffer;
+
+    if((cb > 20) && curl_strnequal(buffer, "Content-disposition:", 20)) {
+        const char *p = buffer + 20;
+
+        for(;;) {
+          char *filename;
+          size_t len;
+
+          while((p < end) && *p && !isalpha((int)*p))
+            p++;
+          if(p > end - 9)
+            break;
+
+          if(memcmp(p, "filename=", 9)) {
+            // no match, find next parameter 
+            while((p < end) && *p && (*p != ';'))
+              p++;
+            if((p < end) && *p)
+              continue;
+            else
+              break;
+          }
+          p += 9;
+
+          len = cb - (size_t)(p - str);
+
+          filename = parse_filename(p, len);
+
+          if(filename) {
+            *(char**)userdata = strdup(filename);
+            free(filename);
+          }
+          break;
+        }
+    }
+
+    return nitems * size;
+}
+
+int getDownloadFileInfo(const char* url, int64_t* size, char** fileName, long* response_code)
+{
+    CURL *curl;
+    CURLcode res;
+    static char* fname = NULL;
+
+    curl = curl_easy_init();
+
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+
+        if (fileName)
+        {
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_cb);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &fname);
+        }
+
+        res = curl_easy_perform(curl);
+
+        // try to get size
+        curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, size);
+
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, response_code);
+
+        if (fileName)
+        {
+            // try to get filename
+            char *url = NULL;
+            curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &url);
+
+            if (fname)
+            {
+              *fileName = strdup(fname);
+              free(fname);
+              fname = NULL;
+            }
+            else if (url)
+            {
+              *fileName = strdup(basename(url));
+            }
+        }
+
+        curl_easy_cleanup(curl);
+    }
+
+    return 0;
+}
+
+static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
+{
+  FileProcessParam *param = (FileProcessParam*)stream;
+  size_t written = sceIoWrite(param->fp, ptr, size*nmemb);
+
+  if (param) {
+      if (param->value)
+          (*param->value) += written;
+
+      if (param->SetProgress)
+          param->SetProgress(param->value ? *param->value : 0, param->max);
+
+      if (param->cancelHandler && param->cancelHandler()) {
+        return CURL_WRITEFUNC_ERROR;
+      }
+  }
+
+  return written;
+}
+
+int downloadFile(const char* url, const char* path, FileProcessParam *param)
+{
+    CURL *curl;
+    FILE *fp;
+    CURLcode res;
+
+    curl = curl_easy_init();
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+
+        param->fp = sceIoOpen(path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+
+        long response_code = 0;
+        if (param->fp >= 0)
+        {
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, param);
+            res = curl_easy_perform(curl);
+
+            sceIoClose(param->fp);
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+            curl_easy_cleanup(curl);
+        }
+        if (response_code != 200) return -1;
+    }
+
+    return 0;
+
 }
 
 int downloadFileProcess(const char *url, const char *dest, int successStep) {
@@ -233,8 +271,16 @@ int downloadFileProcess(const char *url, const char *dest, int successStep) {
   sceKernelDelayThread(DIALOG_WAIT); // Needed to see the percentage
 
   // File size
-  uint64_t size = 0;
-  getDownloadFileSize(url, &size);
+  int64_t size = 0;
+  long code = 0;
+
+  getDownloadFileInfo(url, &size, NULL, &code);
+  if (size < 0 || code != 200)
+  {
+    closeWaitDialog();
+    setDialogStep(DIALOG_STEP_CANCELED);
+    errorDialog(code);
+  }
 
   // Update thread
   thid = createStartUpdateThread(size, 1);
@@ -249,7 +295,7 @@ int downloadFileProcess(const char *url, const char *dest, int successStep) {
   param.cancelHandler = cancelHandler;
 
   int res = downloadFile(url, dest, &param);
-  if (res <= 0) {
+  if (res < 0) {
     sceIoRemove(dest);
     closeWaitDialog();
     setDialogStep(DIALOG_STEP_CANCELED);

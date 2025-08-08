@@ -157,6 +157,9 @@ add_dependencies(VitaShell usbdevice.skprx-self)
 
 target_link_libraries(VitaShell
   ${CMAKE_CURRENT_BINARY_DIR}/modules/user/libVitaShellUser_stub_weak.a
+  curl
+  ssl
+  crypto
   ftpvita
   vita2d
   vorbisfile
